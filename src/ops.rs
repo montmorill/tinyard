@@ -1,5 +1,5 @@
 use crate::Value;
-use nalgebra::{ClosedAddAssign, ClosedDivAssign, ClosedMulAssign, ClosedSubAssign};
+use nalgebra::{ClosedAddAssign, ClosedDivAssign, ClosedSubAssign};
 use num_traits::{One, Zero};
 use simba::scalar::ClosedNeg;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -139,20 +139,22 @@ where
 
 impl<'a, T: nalgebra::Scalar, const N: usize> MulAssign<Borrowed<'a, T, N>> for Value<T, N>
 where
-    T: ClosedAddAssign + ClosedMulAssign + Zero + One,
+    T: AddAssign + MulAssign + Zero + One,
 {
     fn mul_assign(&mut self, rhs: Borrowed<'a, T, N>) {
-        let mut lhs = unsafe { std::mem::MaybeUninit::<Value<T, N>>::uninit().assume_init() };
-        std::mem::swap(self, &mut lhs);
-        self.value = lhs.value.clone() * rhs.value.clone();
+        let lhs = std::mem::replace(self, unsafe {
+            std::mem::MaybeUninit::<_>::uninit().assume_init()
+        });
+        let mut manual = std::mem::ManuallyDrop::new(self);
+        manual.value = lhs.value.clone() * rhs.value.clone();
         #[cfg(not(feature = "hessian"))]
         {
-            self.grad = lhs.grad * rhs.value + rhs.grad * lhs.value;
+            manual.grad = lhs.grad * rhs.value + rhs.grad * lhs.value;
         }
         #[cfg(feature = "hessian")]
         {
-            self.grad = lhs.grad.clone() * rhs.value.clone() + rhs.grad * lhs.value.clone();
-            self.hess = lhs.hess * rhs.value
+            manual.grad = lhs.grad.clone() * rhs.value.clone() + rhs.grad * lhs.value.clone();
+            manual.hess = lhs.hess * rhs.value
                 + rhs.grad * lhs.grad.transpose()
                 + lhs.grad * rhs.grad.transpose()
                 + rhs.hess * lhs.value;
@@ -162,34 +164,28 @@ where
 
 impl<'a, T: nalgebra::Scalar, const N: usize> DivAssign<Borrowed<'a, T, N>> for Value<T, N>
 where
-    T: ClosedAddAssign + ClosedSubAssign + ClosedMulAssign + ClosedDivAssign + Zero + One,
+    T: AddAssign + ClosedSubAssign + MulAssign + ClosedDivAssign + Zero + One,
 {
     fn div_assign(&mut self, rhs: Borrowed<'a, T, N>) {
-        let mut lhs = unsafe { std::mem::MaybeUninit::<Value<T, N>>::uninit().assume_init() };
-        std::mem::swap(self, &mut lhs);
-        self.value = lhs.value.clone() / rhs.value.clone();
+        let lhs = std::mem::replace(self, unsafe {
+            std::mem::MaybeUninit::<_>::uninit().assume_init()
+        });
+        let mut manual = std::mem::ManuallyDrop::new(self);
+        manual.value = lhs.value.clone() / rhs.value.clone();
         #[cfg(not(feature = "hessian"))]
         {
-            self.grad = (lhs.grad * rhs.value.clone() - rhs.grad * lhs.value)
+            manual.grad = (lhs.grad * rhs.value.clone() - rhs.grad * lhs.value)
                 / (rhs.value.clone() * rhs.value);
         }
         #[cfg(feature = "hessian")]
         {
-            self.grad = (lhs.grad * rhs.value.clone() - rhs.grad * lhs.value)
+            manual.grad = (lhs.grad * rhs.value.clone() - rhs.grad * lhs.value)
                 / (rhs.value.clone() * rhs.value.clone());
-            self.hess = (lhs.hess
-                - self.grad.clone() * rhs.grad.transpose()
-                - rhs.grad * self.grad.transpose()
-                - rhs.hess * self.value.clone())
+            manual.hess = (lhs.hess
+                - manual.grad.clone() * rhs.grad.transpose()
+                - rhs.grad * manual.grad.transpose()
+                - rhs.hess * manual.value.clone())
                 / rhs.value;
-
-            // self.grad = (lhs.grad * rhs.value.clone() - rhs.grad * lhs.value.clone())
-            //     / (rhs.value.clone() * rhs.value.clone());
-            // self.hess = (lhs.hess
-            //     - self.grad.clone() * rhs.grad.transpose()
-            //     - rhs.grad * self.grad.transpose())
-            //     / rhs.value
-            //     - rhs.hess * lhs.value;
         }
     }
 }
