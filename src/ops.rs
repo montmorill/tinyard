@@ -3,7 +3,7 @@ use std::ops::{
 };
 
 use nalgebra::{ClosedAddAssign, ClosedDivAssign, ClosedSubAssign};
-use num_traits::{Num, NumAssign, NumAssignRef, One, Zero};
+use num_traits::{ConstOne, ConstZero, Num, NumAssign, One, Zero};
 use simba::scalar::ClosedNeg;
 
 use crate::Value;
@@ -239,7 +239,7 @@ binary_op_impl!(@first Rem rem RemAssign rem_assign);
 
 impl<T: nalgebra::Scalar, const N: usize> Zero for Value<T, N>
 where
-    T: Zero + AddAssign,
+    T: AddAssign + Zero,
 {
     fn zero() -> Self {
         Self::new(T::zero())
@@ -251,9 +251,17 @@ where
             && (|| {
                 #[cfg(feature = "hessian")]
                 return self.hess.as_slice().into_iter().all(T::is_zero);
+                #[allow(unreachable_code)]
                 true
             })()
     }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> ConstZero for Value<T, N>
+where
+    T: AddAssign + ConstZero + Copy,
+{
+    const ZERO: Self = Self::new_const(T::ZERO);
 }
 
 impl<T: nalgebra::Scalar, const N: usize> One for Value<T, N>
@@ -263,6 +271,13 @@ where
     fn one() -> Self {
         Self::new(T::one())
     }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> ConstOne for Value<T, N>
+where
+    T: AddAssign + MulAssign + ConstZero + ConstOne + Copy,
+{
+    const ONE: Self = Self::new_const(T::ONE);
 }
 
 impl<T: nalgebra::Scalar + NumAssign, const N: usize> Num for Value<T, N> {

@@ -1,6 +1,7 @@
 mod ops;
 
-use num_traits::{One, Zero};
+use nalgebra::ArrayStorage;
+use num_traits::{ConstZero, One, Zero};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Value<T: nalgebra::Scalar, const N: usize> {
@@ -36,12 +37,23 @@ impl<T: nalgebra::Scalar, const N: usize> Value<T, N> {
         }
     }
 
-    pub fn active(value: T, index: usize) -> Self
+    pub const fn new_const(value: T) -> Self
+    where
+        T: ConstZero + Copy,
+    {
+        Self {
+            value: value,
+            grad: nalgebra::SVector::from_array_storage(ArrayStorage([[T::ZERO; N]])),
+            #[cfg(feature = "hessian")]
+            hess: nalgebra::SMatrix::from_array_storage(ArrayStorage([[T::ZERO; N]; N])),
+        }
+    }
+
+    pub fn active(mut self, index: usize) -> Self
     where
         T: Zero + One,
     {
-        let mut scalar = Self::new(value);
-        scalar.grad[index] = T::one();
-        scalar
+        self.grad[index] = T::one();
+        self
     }
 }
