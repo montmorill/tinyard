@@ -1,9 +1,8 @@
-use std::ops::{
-    Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
-};
+use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
+use std::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
 
 use nalgebra::{ClosedAddAssign, ClosedDivAssign, ClosedSubAssign};
-use num_traits::{ConstOne, ConstZero, Num, NumAssign, One, Zero};
+use num_traits::{ConstOne, ConstZero, Inv, Num, NumAssign, One, Signed, Zero};
 use simba::scalar::ClosedNeg;
 
 use crate::Value;
@@ -86,22 +85,6 @@ macro_rules! binary_op_impl {
             fn $method(self, rhs: Value<T, N>) -> Self::Output {
                 rhs.$method(self)
             }
-        }
-    }
-}
-
-impl<T: nalgebra::Scalar, const N: usize> Neg for Value<T, N>
-where
-    T: ClosedNeg,
-{
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self {
-            value: -self.value,
-            grad: -self.grad,
-            #[cfg(feature = "hessian")]
-            hess: -self.hess,
         }
     }
 }
@@ -285,6 +268,67 @@ impl<T: nalgebra::Scalar + NumAssign, const N: usize> Num for Value<T, N> {
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
         T::from_str_radix(str, radix).map(|value| Self::new(value))
+    }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> Neg for Value<T, N>
+where
+    T: ClosedNeg,
+{
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            value: -self.value,
+            grad: -self.grad,
+            #[cfg(feature = "hessian")]
+            hess: -self.hess,
+        }
+    }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> Inv for Value<T, N>
+where
+    Self: Div<Output = Value<T, N>> + One,
+{
+    type Output = Self;
+
+    fn inv(self) -> Self::Output {
+        Self::one() / self
+    }
+}
+
+impl<T: nalgebra::Scalar + NumAssign, const N: usize> Signed for Value<T, N>
+where
+    T: Signed,
+{
+    fn abs(&self) -> Self {
+        if self.value.is_negative() {
+            -self.clone()
+        } else {
+            self.clone()
+        }
+    }
+
+    fn abs_sub(&self, other: &Self) -> Self {
+        let result = self.sub(other.clone());
+        if result.is_positive() {
+            result
+        } else {
+            Zero::zero()
+        }
+    }
+
+    fn signum(&self) -> Self {
+        Self::new(self.value.signum())
+    }
+
+    fn is_positive(&self) -> bool {
+        self.value.is_positive()
+    }
+
+    fn is_negative(&self) -> bool {
+        self.value.is_negative()
     }
 }
 
