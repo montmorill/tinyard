@@ -1,4 +1,4 @@
-mod ops;
+mod impls;
 
 use nalgebra::ArrayStorage;
 use num_traits::{ConstZero, One, Zero};

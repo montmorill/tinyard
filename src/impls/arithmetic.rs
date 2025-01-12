@@ -220,6 +220,33 @@ where
 
 binary_op_impl!(@first Rem rem RemAssign rem_assign);
 
+impl<T: nalgebra::Scalar, const N: usize> Neg for Value<T, N>
+where
+    T: ClosedNeg,
+{
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            value: -self.value,
+            grad: -self.grad,
+            #[cfg(feature = "hessian")]
+            hess: -self.hess,
+        }
+    }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> Inv for Value<T, N>
+where
+    Self: One + Div<Output = Self>
+{
+    type Output = Self;
+
+    fn inv(self) -> Self::Output {
+        Self::one() / self
+    }
+}
+
 impl<T: nalgebra::Scalar, const N: usize> Zero for Value<T, N>
 where
     T: AddAssign + Zero,
@@ -271,33 +298,6 @@ impl<T: nalgebra::Scalar + NumAssign, const N: usize> Num for Value<T, N> {
     }
 }
 
-impl<T: nalgebra::Scalar, const N: usize> Neg for Value<T, N>
-where
-    T: ClosedNeg,
-{
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self {
-            value: -self.value,
-            grad: -self.grad,
-            #[cfg(feature = "hessian")]
-            hess: -self.hess,
-        }
-    }
-}
-
-impl<T: nalgebra::Scalar, const N: usize> Inv for Value<T, N>
-where
-    Self: Div<Output = Value<T, N>> + One,
-{
-    type Output = Self;
-
-    fn inv(self) -> Self::Output {
-        Self::one() / self
-    }
-}
-
 impl<T: nalgebra::Scalar + NumAssign, const N: usize> Signed for Value<T, N>
 where
     T: Signed,
@@ -329,24 +329,5 @@ where
 
     fn is_negative(&self) -> bool {
         self.value.is_negative()
-    }
-}
-
-impl<T: nalgebra::Scalar, const N: usize> Value<T, N> {
-    fn chain(
-        &self,
-        value: T,                            // f
-        grad: T,                             // df/dx
-        #[cfg(feature = "hessian")] hess: T, // ddf/dxx
-    ) -> Self
-    where
-        T: AddAssign + MulAssign + Zero + One,
-    {
-        Self {
-            value,
-            #[cfg(feature = "hessian")]
-            hess: &self.grad * self.grad.transpose() * hess + &self.hess * grad.clone(),
-            grad: &self.grad * grad,
-        }
     }
 }
