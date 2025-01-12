@@ -1,7 +1,9 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
+};
 
 use nalgebra::{ClosedAddAssign, ClosedDivAssign, ClosedSubAssign};
-use num_traits::{One, Zero};
+use num_traits::{Num, NumAssign, NumAssignRef, One, Zero};
 use simba::scalar::ClosedNeg;
 
 use crate::Value;
@@ -214,6 +216,62 @@ where
 }
 
 binary_op_impl!(@second Div div DivAssign div_assign AddAssign + ClosedSubAssign + MulAssign + Zero + One);
+
+impl<T: nalgebra::Scalar, const N: usize> RemAssign for Value<T, N>
+where
+    T: RemAssign,
+{
+    fn rem_assign(&mut self, rhs: Self) {
+        self.value %= rhs.value;
+    }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> RemAssign<&Self> for Value<T, N>
+where
+    T: RemAssign,
+{
+    fn rem_assign(&mut self, rhs: &Self) {
+        self.value %= rhs.value.clone();
+    }
+}
+
+binary_op_impl!(@first Rem rem RemAssign rem_assign);
+
+impl<T: nalgebra::Scalar, const N: usize> Zero for Value<T, N>
+where
+    T: Zero + AddAssign,
+{
+    fn zero() -> Self {
+        Self::new(T::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        self.value.is_zero()
+            && self.grad.as_slice().into_iter().all(T::is_zero)
+            && (|| {
+                #[cfg(feature = "hessian")]
+                return self.hess.as_slice().into_iter().all(T::is_zero);
+                true
+            })()
+    }
+}
+
+impl<T: nalgebra::Scalar, const N: usize> One for Value<T, N>
+where
+    T: AddAssign + MulAssign + Zero + One,
+{
+    fn one() -> Self {
+        Self::new(T::one())
+    }
+}
+
+impl<T: nalgebra::Scalar + NumAssign, const N: usize> Num for Value<T, N> {
+    type FromStrRadixErr = T::FromStrRadixErr;
+
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        T::from_str_radix(str, radix).map(|value| Self::new(value))
+    }
+}
 
 impl<T: nalgebra::Scalar, const N: usize> Value<T, N> {
     fn chain(

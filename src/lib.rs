@@ -2,7 +2,7 @@ mod ops;
 
 use num_traits::{One, Zero};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Value<T: nalgebra::Scalar, const N: usize> {
     value: T,
     grad: nalgebra::SVector<T, N>,
