@@ -3,15 +3,15 @@ mod impls;
 use nalgebra::ArrayStorage;
 use num_traits::{ConstZero, One, Zero};
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Value<T: nalgebra::Scalar, const N: usize> {
+#[derive(Debug, Clone)]
+pub struct Tin<T: nalgebra::Scalar, const N: usize> {
     value: T,
     grad: nalgebra::SVector<T, N>,
     #[cfg(feature = "hessian")]
     hess: nalgebra::SMatrix<T, N, N>,
 }
 
-impl<T: nalgebra::Scalar, const N: usize> Value<T, N> {
+impl<T: nalgebra::Scalar, const N: usize> Tin<T, N> {
     pub fn value(&self) -> &T {
         &self.value
     }
